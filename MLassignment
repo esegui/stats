@@ -1,0 +1,98 @@
+# Data Cleaning
+```r
+training <- read.csv(url("plm-training.csv"))
+testing <- read.csv(url("plm-testing.csv"))
+
+label <- createDataPartition(training$classe, p = 0.7, list = FALSE)
+train <- training[label, ]
+test <- training[-label, ]
+```
+
+From among 160 variables present in the dataset, some variables have nearly zero variance whereas some contain a lot of NA terms which need to be excluded from the dataset. Moreover, other 5 variables used for identification can also be removed. 
+
+
+```r
+zero <- nearZeroVar(train)
+train <- train[ ,-NZV]
+test <- test[ ,-NZV]
+
+NAcolumns <- c()
+for (i in 1:ncol(data)) {
+  sum <- sum(is.na(data[[i]]))
+  if (sum > (nrow(data)*0.95)) {
+   NAcolumns[i] <- i  
+  }
+}
+
+train <- train[ , -c(zero, NAcolumns, 1:5)]
+test <- test[ , -c(zero, NAcolumns, 1:5)]
+```
+ 160 variables to 54.
+
+## Exploratory Analysis
+
+```r
+library(corrplot)
+corrMat <- cor(train[,-54])
+corrplot(corrMat, method = "color")
+```
+A couple variables have multicollinearity
+
+## 3 Prediction Models
+
+### Decision Tree
+
+```r
+library(rpart)
+library(rpart.plot)
+set.seed(123)
+modeltree <- rpart(classe ~ ., data = train, method = "class")
+plot(modeltree)
+fancyRpartPlot(modeltree)
+
+predicttree <- predict(modeltree, test, type = "class")
+confMattree <- confusionMatrix(predicttree, as.factor(test$classe))
+
+Accuracy : 0.75        
+Kappa : 0.68         
+```
+
+### Random Forest
+
+
+```r
+library(caret)
+set.seed(123)
+control <- trainControl(method = "cv", number = 3, verboseIter=FALSE)
+modelRF <- train(classe ~ ., data = train, method = "rf", trControl = control)
+modelRF$finalModel
+predictRF <- predict(modelRF, test)
+confMatRF <- confusionMatrix(predictRF, as.factor(test$classe))
+confMatRF
+```
+Accuracy : 0.9975          
+Kappa : 0.9968          
+
+### Generalized Boosted Model
+```r
+set.seed(123)
+control <- trainControl(method = "repeatedcv", number = 5, repeats = 1, verboseIter = FALSE)
+modelGBM <- train(classe ~ ., data = train, trControl = control, method = "gbm", verbose = FALSE)
+modelGBM$finalModel
+predictGBM <- predict(modelGBM, test)
+confMatGBM <- confusionMatrix(predictGBM, as.factor(test$classe))
+```
+
+Accuracy : 0.9888          
+Kappa : 0.9858          
+```
+
+Random Forest has maximum accuracy of 99.8%
+
+## Prediction with Testing Set
+
+
+```r
+predictRF <- predict(modelRF, testing)
+predictRF
+```
